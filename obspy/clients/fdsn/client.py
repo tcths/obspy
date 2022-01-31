@@ -27,13 +27,17 @@ import obspy
 from obspy import UTCDateTime, read_inventory
 from obspy.core.compatibility import collections_abc
 from .header import (DEFAULT_PARAMETERS, DEFAULT_USER_AGENT, FDSNWS,
-                     OPTIONAL_PARAMETERS, PARAMETER_ALIASES, URL_MAPPINGS,
+                     OPTIONAL_PARAMETERS, PARAMETER_ALIASES,
+                     URL_DEFAULT_SUBPATH, URL_MAPPINGS, URL_MAPPING_SUBPATHS,
                      WADL_PARAMETERS_NOT_TO_BE_PARSED, DEFAULT_SERVICES,
                      FDSNException, FDSNRedirectException, FDSNNoDataException,
                      FDSNTimeoutException,
                      FDSNNoAuthenticationServiceException,
                      FDSNBadRequestException, FDSNNoServiceException,
-                     FDSNInternalServerException, FDSNTooManyRequestsException,
+                     FDSNInternalServerException,
+                     FDSNNotImplementedException,
+                     FDSNBadGatewayException,
+                     FDSNTooManyRequestsException,
                      FDSNRequestTooLargeException,
                      FDSNServiceUnavailableException,
                      FDSNUnauthorizedException,
@@ -106,11 +110,13 @@ class Client(object):
     # Dictionary caching any discovered service. Therefore repeatedly
     # initializing a client with the same base URL is cheap.
     __service_discovery_cache = {}
-
+    #: Regex for UINT8
     RE_UINT8 = r'(?:25[0-5]|2[0-4]\d|[0-1]?\d{1,2})'
+    #: Regex for HEX4
     RE_HEX4 = r'(?:[\d,a-f]{4}|[1-9,a-f][0-9,a-f]{0,2}|0)'
-
+    #: Regex for IPv4
     RE_IPv4 = r'(?:' + RE_UINT8 + r'(?:\.' + RE_UINT8 + r'){3})'
+    #: Regex for IPv6
     RE_IPv6 = \
         r'(?:\[' + RE_HEX4 + r'(?::' + RE_HEX4 + r'){7}\]' + \
         r'|\[(?:' + RE_HEX4 + r':){0,5}' + RE_HEX4 + r'::\]' + \
@@ -120,13 +126,13 @@ class Client(object):
         r'|\[' + RE_HEX4 + r':' + \
         r'(?:' + RE_HEX4 + r':|:' + RE_HEX4 + r'){0,4}' + \
         r':' + RE_HEX4 + r'\])'
-
+    #: Regex for checking the validity of URLs
     URL_REGEX = r'https?://' + \
                 r'(' + RE_IPv4 + \
                 r'|' + RE_IPv6 + \
                 r'|localhost' + \
-                r'|\w+' + \
-                r'|(?:\w(?:[\w-]{0,61}[\w])?\.){1,}([a-z]{2,6}))' + \
+                r'|\w(?:[\w-]*\w)?' + \
+                r'|(?:\w(?:[\w-]{0,61}[\w])?\.){1,}([a-z][a-z0-9-]{1,62}))' + \
                 r'(?::\d{2,5})?' + \
                 r'(/[\w\.-]+)*/?$'
 
@@ -220,12 +226,16 @@ class Client(object):
         self.__version_cache = {}
 
         if base_url.upper() in URL_MAPPINGS:
-            base_url = URL_MAPPINGS[base_url.upper()]
+            url_mapping = base_url.upper()
+            base_url = URL_MAPPINGS[url_mapping]
+            url_subpath = URL_MAPPING_SUBPATHS.get(
+                url_mapping, URL_DEFAULT_SUBPATH)
         else:
             if base_url.isalpha():
                 msg = "The FDSN service shortcut `{}` is unknown."\
                       .format(base_url)
                 raise ValueError(msg)
+            url_subpath = URL_DEFAULT_SUBPATH
 
         # Make sure the base_url does not end with a slash.
         base_url = base_url.strip("/")
@@ -236,6 +246,7 @@ class Client(object):
             raise ValueError(msg)
 
         self.base_url = base_url
+        self.url_subpath = url_subpath
 
         self._set_opener(user, password)
 
@@ -376,8 +387,9 @@ class Client(object):
                 raise ValueError(msg)
 
         # force https so that we don't send around tokens unsecurely
-        url = 'https://{}/fdsnws/dataselect/1/auth'.format(
-            urlparse(self.base_url).netloc + urlparse(self.base_url).path)
+        url = 'https://{}{}/dataselect/1/auth'.format(
+            urlparse(self.base_url).netloc + urlparse(self.base_url).path,
+            self.url_subpath)
         # paranoid: check again that we only send the token to https
         if urlparse(url).scheme != "https":
             msg = 'This should not happen, please file a bug report.'
@@ -398,10 +410,11 @@ class Client(object):
                    latitude=None, longitude=None, minradius=None,
                    maxradius=None, mindepth=None, maxdepth=None,
                    minmagnitude=None, maxmagnitude=None, magnitudetype=None,
-                   includeallorigins=None, includeallmagnitudes=None,
-                   includearrivals=None, eventid=None, limit=None, offset=None,
-                   orderby=None, catalog=None, contributor=None,
-                   updatedafter=None, filename=None, **kwargs):
+                   eventtype=None, includeallorigins=None,
+                   includeallmagnitudes=None, includearrivals=None,
+                   eventid=None, limit=None, offset=None, orderby=None,
+                   catalog=None, contributor=None, updatedafter=None,
+                   filename=None, **kwargs):
         """
         Query the event service of the client.
 
@@ -409,7 +422,7 @@ class Client(object):
         >>> cat = client.get_events(eventid=609301)
         >>> print(cat)
         1 Event(s) in Catalog:
-        1997-10-14T09:53:11.070000Z | -22.145, -176.720 | 7.8 mw
+        1997-10-14T09:53:11.070000Z | -22.145, -176.720 | 7.8 ...
 
         The return value is a :class:`~obspy.core.event.Catalog` object
         which can contain any number of events.
@@ -420,9 +433,9 @@ class Client(object):
         ...                         catalog="ISC")
         >>> print(cat)
         3 Event(s) in Catalog:
-        2001-01-07T02:55:59.290000Z |  +9.801,  +76.548 | 4.9 mb
-        2001-01-07T02:35:35.170000Z | -21.291,  -68.308 | 4.4 mb
-        2001-01-07T00:09:25.630000Z | +22.946, -107.011 | 4.0 mb
+        2001-01-07T02:55:59.290000Z |  +9.801,  +76.548 | 4.9 ...
+        2001-01-07T02:35:35.170000Z | -21.291,  -68.308 | 4.4 ...
+        2001-01-07T00:09:25.630000Z | +22.946, -107.011 | 4.0 ...
 
         :type starttime: :class:`~obspy.core.utcdatetime.UTCDateTime`, optional
         :param starttime: Limit to events on or after the specified start time.
@@ -468,6 +481,12 @@ class Client(object):
         :type magnitudetype: str, optional
         :param magnitudetype: Specify a magnitude type to use for testing the
             minimum and maximum limits.
+        :type eventtype: str, optional
+        :param eventtype: Limit to events with a specified event type.
+            Multiple types are comma-separated (e.g.,
+            ``"earthquake,quarry blast"``). Allowed values are from QuakeML.
+            See :const:`obspy.core.event.header.EventType` for a list of
+            allowed event types.
         :type includeallorigins: bool, optional
         :param includeallorigins: Specify if all origins for the event should
             be included, default is data center dependent but is suggested to
@@ -478,9 +497,9 @@ class Client(object):
             suggested to be the preferred magnitude only.
         :type includearrivals: bool, optional
         :param includearrivals: Specify if phase arrivals should be included.
-        :type eventid: str (or int, dependent on data center), optional
+        :type eventid: str or int, optional
         :param eventid: Select a specific event by ID; event identifiers are
-            data center specific.
+            data center specific (String or Integer).
         :type limit: int, optional
         :param limit: Limit the results to the specified number of events.
         :type offset: int, optional
@@ -977,7 +996,7 @@ class Client(object):
             information to each trace. This can be used to remove response
             using :meth:`~obspy.core.stream.Stream.remove_response`.
 
-        :type bulk: str, file or list of lists
+        :type bulk: str, file or list[list]
         :param bulk: Information about the requested data. See above for
             details.
         :type quality: str, optional
@@ -1071,7 +1090,7 @@ class Client(object):
         >>> print(inv)  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
         Inventory created at ...
             Created by: IRIS WEB SERVICE: fdsnws-station | version: ...
-                        ...
+
             Sending institution: IRIS-DMC (IRIS-DMC)
             Contains:
                 Networks (2):
@@ -1080,6 +1099,7 @@ class Client(object):
                     GR.GRA1 (GRAFENBERG ARRAY, BAYERN)
                     IU.ANMO (Albuquerque, New Mexico, USA)
                 Channels (0):
+
         >>> inv.plot()  # doctest: +SKIP
 
         .. plot::
@@ -1101,7 +1121,7 @@ class Client(object):
         >>> print(inv)  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
         Inventory created at ...
             Created by: IRIS WEB SERVICE: fdsnws-station | version: ...
-                        ...
+
             Sending institution: IRIS-DMC (IRIS-DMC)
             Contains:
                 Networks (2):
@@ -1130,7 +1150,7 @@ class Client(object):
                     GR.GRA1..BHE, GR.GRA1..BHN, GR.GRA1..BHZ, IU.ANMO.00.BHZ,
                     IU.ANMO.10.BHZ
 
-        :type bulk: str, file or list of lists
+        :type bulk: str, file or list[list]
         :param bulk: Information about the requested data. See above for
             details.
         :type level: str
@@ -1411,7 +1431,8 @@ class Client(object):
                 resource_type = "queryauth"
         return build_url(self.base_url, service, self.major_versions[service],
                          resource_type, parameters,
-                         service_mappings=self._service_mappings)
+                         service_mappings=self._service_mappings,
+                         subpath=self.url_subpath)
 
     def _discover_services(self):
         """
@@ -1637,7 +1658,7 @@ def convert_to_string(value):
 
 
 def build_url(base_url, service, major_version, resource_type,
-              parameters=None, service_mappings=None):
+              parameters=None, service_mappings=None, subpath='fdsnws'):
     """
     URL builder for the FDSN webservices.
 
@@ -1683,8 +1704,13 @@ def build_url(base_url, service, major_version, resource_type,
     if service in service_mappings:
         url = "/".join((service_mappings[service], resource_type))
     else:
-        url = "/".join((base_url, "fdsnws", service,
-                        str(major_version), resource_type))
+        if subpath is None:
+            parts = (base_url, service, str(major_version),
+                     resource_type)
+        else:
+            parts = (base_url, subpath.lstrip('/'), service,
+                     str(major_version), resource_type)
+        url = "/".join(parts)
 
     if parameters:
         # Strip parameters.
@@ -1748,6 +1774,12 @@ def raise_on_error(code, data):
     elif code == 500:
         raise FDSNInternalServerException("Service responds: Internal server "
                                           "error", server_info)
+    elif code == 501:
+        raise FDSNNotImplementedException("Service responds: Not implemented ",
+                                          server_info)
+    elif code == 502:
+        raise FDSNBadGatewayException("Service responds: Bad gateway ",
+                                      server_info)
     elif code == 503:
         raise FDSNServiceUnavailableException("Service temporarily "
                                               "unavailable",

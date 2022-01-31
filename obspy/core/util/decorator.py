@@ -10,7 +10,7 @@ Decorator used in ObsPy.
 """
 import functools
 import inspect
-import os
+from pathlib import Path
 import re
 import socket
 import tarfile
@@ -89,7 +89,7 @@ def deprecated_keywords(keywords):
                          if new_key == key_])
                     raise Exception(msg3 % (conflicting_keys, fname, new_key))
             # map deprecated keywords to new keywords
-            for kw in kwargs.keys():
+            for kw in list(kwargs):
                 if kw in keywords:
                     nkw = keywords[kw]
                     if nkw is None:
@@ -101,7 +101,7 @@ def deprecated_keywords(keywords):
                                       category=ObsPyDeprecationWarning,
                                       stacklevel=3)
                         kwargs[nkw] = kwargs[kw]
-                    del(kwargs[kw])
+                    del kwargs[kw]
             return func(*args, **kwargs)
         return echo_func
 
@@ -140,7 +140,7 @@ def uncompress_file(func, filename, *args, **kwargs):
         return func(filename, *args, **kwargs)
     if not isinstance(filename, str):
         return func(filename, *args, **kwargs)
-    elif not os.path.exists(filename):
+    elif not Path(filename).exists():
         msg = "File not found '%s'" % (filename)
         raise IOError(msg)
     # check if we got a compressed file or archive

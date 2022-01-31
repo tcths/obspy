@@ -116,7 +116,8 @@ def is_fdsn_station_text_file(path_or_file_object):
     return False
 
 
-def read_fdsn_station_text_file(path_or_file_object):
+def read_fdsn_station_text_file(
+        path_or_file_object, **kwargs):  # @UnusedVariable
     """
     Function reading a FDSN station text file to an inventory object.
 
@@ -381,7 +382,7 @@ def _write_stationtxt(inventory, path_or_file_object, level='channel',
     Writes an inventory object to a file or file-like object in stationtxt
     format.
 
-    :type inventory: :class:`~obspy.core.inventory.Inventory`
+    :type inventory: :class:`~obspy.core.inventory.inventory.Inventory`
     :param inventory: The inventory instance to be written.
     :param path_or_file_object: The file or file-like object to be written to.
     :param level: Specify level of detail using one of: ``'network'``,

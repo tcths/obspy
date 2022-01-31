@@ -38,7 +38,8 @@ def _create_example_inventory():
 
 
 @map_example_filename("path_or_file_object")
-def read_inventory(path_or_file_object=None, format=None, *args, **kwargs):
+def read_inventory(path_or_file_object=None, format=None, level='response',
+                   *args, **kwargs):
     """
     Function to read inventory files.
 
@@ -51,6 +52,10 @@ def read_inventory(path_or_file_object=None, format=None, *args, **kwargs):
     :type format: str
     :param format: Format of the file to read (e.g. ``"STATIONXML"``). See the
         `Supported Formats`_ section below for a list of supported formats.
+    :type level: str
+    :param level: Level of detail to read from file. One of ``'response'``,
+        ``'channel'``, ``'station'`` or ``'network'``. Lower level of detail
+        can result in much shorter reading times for some file formats.
     :rtype: :class:`~obspy.core.inventory.inventory.Inventory`
     :return: An ObsPy :class:`~obspy.core.inventory.inventory.Inventory`
         object.
@@ -76,6 +81,9 @@ def read_inventory(path_or_file_object=None, format=None, *args, **kwargs):
         StationXML standard and how to output it to StationXML
         see the :ref:`ObsPy Tutorial <stationxml-extra>`.
     """
+    # add default parameters to kwargs so sub-modules may handle them
+    kwargs['level'] = level
+
     if path_or_file_object is None:
         # if no pathname or URL specified, return example catalog
         return _create_example_inventory()
@@ -96,7 +104,10 @@ def _read(filename, format=None, **kwargs):
 
 class Inventory(ComparingObject):
     """
-    The root object of the Inventory->Network->Station->Channel hierarchy.
+    The root object of the
+    :class:`~obspy.core.inventory.network.Network`->
+    :class:`~obspy.core.inventory.station.Station`->
+    :class:`~obspy.core.inventory.channel.Channel` hierarchy.
 
     In essence just a container for one or more networks.
     """
@@ -143,7 +154,7 @@ class Inventory(ComparingObject):
         """
         __eq__ method of the Inventory object.
 
-        :type other: :class:`~obspy.core.inventory.Inventory`
+        :type other: :class:`~obspy.core.inventory.inventory.Inventory`
         :param other: Inventory object for comparison.
         :rtype: bool
         :return: ``True`` if both Inventories are equal.
@@ -836,10 +847,10 @@ class Inventory(ComparingObject):
             * ``"f"`` (full)
 
             Defaults to ``"l"``
-        :type continent_fill_color: Valid matplotlib color, optional
+        :type continent_fill_color: valid matplotlib color, optional
         :param continent_fill_color:  Color of the continents. Defaults to
             ``"0.9"`` which is a light gray.
-        :type water_fill_color: Valid matplotlib color, optional
+        :type water_fill_color: valid matplotlib color, optional
         :param water_fill_color: Color of all water bodies.
             Defaults to ``"white"``.
         :type marker: str
@@ -857,7 +868,7 @@ class Inventory(ComparingObject):
             drawn in a different color. A dictionary can be provided that maps
             network codes to color values (e.g.
             ``color_per_network={"GR": "black", "II": "green"}``).
-        :type colormap: str, any matplotlib colormap, optional
+        :type colormap: str, valid matplotlib colormap, optional
         :param colormap: Only used if ``color_per_network=True``. Specifies
             which colormap is used to draw the colors for the individual
             networks. Defaults to the "Paired" color map.
@@ -936,13 +947,13 @@ class Inventory(ComparingObject):
                      color_per_network={'GR': 'blue',
                                         'BW': 'green'})
 
-        Combining a station and event plot (uses basemap):
+        Combining a station and event plot:
 
         >>> from obspy import read_inventory, read_events
         >>> inv = read_inventory()
         >>> cat = read_events()
-        >>> fig = inv.plot(method="basemap", show=False)  # doctest:+SKIP
-        >>> cat.plot(method="basemap", fig=fig)  # doctest:+SKIP
+        >>> fig = inv.plot(show=False)  # doctest:+SKIP
+        >>> cat.plot(fig=fig)  # doctest:+SKIP
 
         .. plot::
 
@@ -1002,20 +1013,20 @@ class Inventory(ComparingObject):
 
         if legend is not None and color_per_network:
             ax = fig.axes[0]
-            count = len(ax.collections)
             for code, color in sorted(color_per_network.items()):
                 ax.scatter([0], [0], size, color, label=code, marker=marker)
             # workaround for older matplotlib versions
             try:
-                ax.legend(loc=legend, fancybox=True, scatterpoints=1,
-                          fontsize="medium", markerscale=0.8,
-                          handletextpad=0.1)
+                leg = ax.legend(loc=legend, fancybox=True, scatterpoints=1,
+                                fontsize="medium", markerscale=0.8,
+                                handletextpad=0.1)
+                leg.remove()
             except TypeError:
                 leg_ = ax.legend(loc=legend, fancybox=True, scatterpoints=1,
                                  markerscale=0.8, handletextpad=0.1)
-                leg_.prop.set_size("medium")
+                leg_.remove()
             # remove collections again solely created for legend handles
-            ax.collections = ax.collections[:count]
+            # ax.collections = ax.collections[:count]
 
         if outfile:
             fig.savefig(outfile)
@@ -1039,9 +1050,18 @@ class Inventory(ComparingObject):
         :type output: str
         :param output: Output units. One of:
 
-                * ``"DISP"`` -- displacement, output unit is meters;
-                * ``"VEL"`` -- velocity, output unit is meters/second; or,
-                * ``"ACC"`` -- acceleration, output unit is meters/second**2.
+            ``"DISP"``
+                displacement, output unit is meters
+            ``"VEL"``
+                velocity, output unit is meters/second
+            ``"ACC"``
+                acceleration, output unit is meters/second**2
+            ``"DEF"``
+                default units, the response is calculated in
+                output units/input units (last stage/first stage).
+                Useful if the units for a particular type of sensor (e.g., a
+                pressure sensor) cannot be converted to displacement, velocity
+                or acceleration.
 
         :type network: str
         :param network: Only plot matching networks. Accepts UNIX style

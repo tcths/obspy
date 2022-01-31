@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Module for handling ObsPy Trace objects.
+Module for handling ObsPy :class:`~obspy.core.trace.Trace` and
+:class:`~obspy.core.trace.Stats` objects.
 
 :copyright:
     The ObsPy Development Team (devs@obspy.org)
@@ -27,7 +28,8 @@ from obspy.core.util.misc import (flat_not_masked_contiguous, get_window_times,
 
 class Stats(AttribDict):
     """
-    A container for additional header information of a ObsPy Trace object.
+    A container for additional header information of a ObsPy
+    :class:`~obspy.core.trace.Trace` object.
 
     A ``Stats`` object may contain all header information (also known as meta
     data) of a :class:`~obspy.core.trace.Trace` object. Those headers may be
@@ -957,7 +959,7 @@ class Trace(object):
             from obspy import read
             st = read()
             tr = st[0]
-            tr.spectrogram(sphinx=True)
+            tr.spectrogram()
         """
         # set some default values
         if 'samp_rate' not in kwargs:
@@ -1650,7 +1652,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         :type sampling_rate: float
         :param sampling_rate: The sampling rate of the resampled signal.
-        :type window: array_like, callable, str, float, or tuple, optional
+        :type window: :class:`numpy.ndarray`, callable, str, float, or tuple,
+            optional
         :param window: Specifies the window applied to the signal in the
             Fourier domain. Defaults to ``'hanning'`` window. See
             :func:`scipy.signal.resample` for details.
@@ -1663,7 +1666,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         .. note::
 
-            The :class:`~Trace` object has three different methods to change
+            The :class:`~obspy.core.trace.Trace` object has
+            three different methods to change
             the sampling rate of its data: :meth:`~.resample`,
             :meth:`~.decimate`, and :meth:`~.interpolate`
 
@@ -1744,6 +1748,12 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         # interpolate
         num = int(self.stats.npts / factor)
+        if num == 0:
+            msg = ("Resampled trace would have less than one sample. "
+                   "Retaining exactly one sample.")
+            warnings.warn(msg)
+            num = 1
+
         df = 1.0 / (self.stats.npts * self.stats.delta)
         d_large_f = 1.0 / num * sampling_rate
         f = df * np.arange(0, self.stats.npts // 2 + 1, dtype=np.int32)
@@ -1789,9 +1799,9 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         .. note::
 
-            The :class:`~Trace` object has three different methods to change
-            the sampling rate of its data: :meth:`~.resample`,
-            :meth:`~.decimate`, and :meth:`~.interpolate`
+            The :class:`~obspy.core.trace.Trace` object has three different
+            methods to change the sampling rate of its data:
+            :meth:`~.resample`, :meth:`~.decimate`, and :meth:`~.interpolate`
 
             Make sure to choose the most appropriate one for the problem at
             hand.
@@ -1934,12 +1944,12 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         ``'cumtrapz'``
             First order integration of data using the trapezoidal rule. Uses
-            :func:`obspy.signal.differentiate_and_integrate.integrate_cumtrapz`
+            :func:`~obspy.signal.differentiate_and_integrate.integrate_cumtrapz`
 
         ``'spline'``
             Integrates by generating an interpolating spline and integrating
             that. Uses
-            :func:`obspy.signal.differentiate_and_integrate.integrate_spline`
+            :func:`~obspy.signal.differentiate_and_integrate.integrate_spline`
 
         .. note::
 
@@ -2087,44 +2097,45 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             :func:`obspy.signal.invsim.cosine_taper`.
         ``'barthann'``
             Modified Bartlett-Hann window. (uses:
-            :func:`scipy.signal.barthann`)
+            :func:`scipy.signal.windows.barthann`)
         ``'bartlett'``
-            Bartlett window. (uses: :func:`scipy.signal.bartlett`)
+            Bartlett window. (uses: :func:`scipy.signal.windows.bartlett`)
         ``'blackman'``
-            Blackman window. (uses: :func:`scipy.signal.blackman`)
+            Blackman window. (uses: :func:`scipy.signal.windows.blackman`)
         ``'blackmanharris'``
             Minimum 4-term Blackman-Harris window. (uses:
-            :func:`scipy.signal.blackmanharris`)
+            :func:`scipy.signal.windows.blackmanharris`)
         ``'bohman'``
-            Bohman window. (uses: :func:`scipy.signal.bohman`)
+            Bohman window. (uses: :func:`scipy.signal.windows.bohman`)
         ``'boxcar'``
-            Boxcar window. (uses: :func:`scipy.signal.boxcar`)
+            Boxcar window. (uses: :func:`scipy.signal.windows.boxcar`)
         ``'chebwin'``
-            Dolph-Chebyshev window. (uses: :func:`scipy.signal.chebwin`)
+            Dolph-Chebyshev window.
+            (uses: :func:`scipy.signal.windows.chebwin`)
         ``'flattop'``
-            Flat top window. (uses: :func:`scipy.signal.flattop`)
+            Flat top window. (uses: :func:`scipy.signal.windows.flattop`)
         ``'gaussian'``
             Gaussian window with standard-deviation std. (uses:
-            :func:`scipy.signal.gaussian`)
+            :func:`scipy.signal.windows.gaussian`)
         ``'general_gaussian'``
             Generalized Gaussian window. (uses:
-            :func:`scipy.signal.general_gaussian`)
+            :func:`scipy.signal.windows.general_gaussian`)
         ``'hamming'``
-            Hamming window. (uses: :func:`scipy.signal.hamming`)
+            Hamming window. (uses: :func:`scipy.signal.windows.hamming`)
         ``'hann'``
-            Hann window. (uses: :func:`scipy.signal.hann`)
+            Hann window. (uses: :func:`scipy.signal.windows.hann`)
         ``'kaiser'``
             Kaiser window with shape parameter beta. (uses:
-            :func:`scipy.signal.kaiser`)
+            :func:`scipy.signal.windows.kaiser`)
         ``'nuttall'``
             Minimum 4-term Blackman-Harris window according to Nuttall.
-            (uses: :func:`scipy.signal.nuttall`)
+            (uses: :func:`scipy.signal.windows.nuttall`)
         ``'parzen'``
-            Parzen window. (uses: :func:`scipy.signal.parzen`)
+            Parzen window. (uses: :func:`scipy.signal.windows.parzen`)
         ``'slepian'``
-            Slepian window. (uses: :func:`scipy.signal.slepian`)
+            Slepian window. (uses: :func:`scipy.signal.windows.slepian`)
         ``'triang'``
-            Triangular window. (uses: :func:`scipy.signal.triang`)
+            Triangular window. (uses: :func:`scipy.signal.windows.triang`)
         """
         type = type.lower()
         side = side.lower()
@@ -2340,9 +2351,9 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         .. note::
 
-            The :class:`~Trace` object has three different methods to change
-            the sampling rate of its data: :meth:`~.resample`,
-            :meth:`~.decimate`, and :meth:`~.interpolate`.
+            The :class:`obspy.core.trace.Trace` object has
+            three different methods to change the sampling rate of its data:
+            :meth:`~.resample`, :meth:`~.decimate`, and :meth:`~.interpolate`.
 
             Make sure to choose the most appropriate one for the problem at
             hand.
@@ -2510,6 +2521,12 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             plotting with absolute time on axes, see :mod:`matplotlib.dates`
             and :func:`matplotlib.dates.date2num`, ``type="matplotlib"``)
 
+        .. note::
+            The option ``type="utcdatetime"`` shouldn't be used for Traces with
+            a large sample size as it will generate an array of thousands of
+            :class:`UTCDateTime.timestamp <obspy.core.utcdatetime.UTCDateTime>`
+            objects.
+
         >>> from obspy import read, UTCDateTime
         >>> tr = read()[0]
 
@@ -2559,8 +2576,9 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         elif type == "timestamp":
             time_array = time_array + self.stats.starttime.timestamp
         elif type == "utcdatetime":
-            time_array = np.array(
-                [self.stats.starttime + t_ for t_ in time_array])
+            time_array = np.vectorize(
+                lambda t: self.stats.starttime + t,
+                otypes=[UTCDateTime])(time_array)
         elif type == "matplotlib":
             from matplotlib.dates import date2num
             time_array = (
@@ -2622,10 +2640,10 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
     def attach_response(self, inventories):
         """
         Search for and attach channel response to the trace as
-        :class:`Trace`.stats.response. Raises an exception if no matching
-        response can be found.
+        :class:`obspy.core.trace.Trace`.stats.response. Raises an exception
+        if no matching response can be found.
         To subsequently deconvolve the instrument response use
-        :meth:`Trace.remove_response`.
+        :meth:`obspy.core.trace.Trace.remove_response`.
 
         >>> from obspy import read, read_inventory
         >>> st = read()
@@ -2683,8 +2701,10 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         .. note::
 
-            Using :meth:`~Trace.remove_response` is equivalent to using
-            :meth:`~Trace.simulate` with the identical response provided as
+            Using :meth:`~obspy.core.trace.Trace.remove_response` is equivalent
+            to using
+            :meth:`~obspy.core.trace.Trace.simulate` with the identical
+            response provided as
             a (dataless) SEED or RESP file and when using the same
             `water_level` and `pre_filt` (and options `sacsim=True` and
             `pitsasim=False` which influence very minor details in detrending
@@ -2738,8 +2758,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             or None.
         :param inventory: Station metadata to use in search for adequate
             response. If inventory parameter is not supplied, the response
-            has to be attached to the trace with :meth:`Trace.attach_response`
-            beforehand.
+            has to be attached to the trace with
+            :meth:`obspy.core.trace.Trace.attach_response` beforehand.
         :type output: str
         :param output: Output units. One of:
 
@@ -2749,10 +2769,16 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
                 velocity, output unit is meters/second
             ``"ACC"``
                 acceleration, output unit is meters/second**2
+            ``"DEF"``
+                default units, the response is calculated in
+                output units/input units (last stage/first stage).
+                Useful if the units for a particular type of sensor (e.g., a
+                pressure sensor) cannot be converted to displacement, velocity
+                or acceleration.
 
         :type water_level: float
         :param water_level: Water level for deconvolution.
-        :type pre_filt: list or tuple of four float
+        :type pre_filt: list or tuple(float, float, float, float)
         :param pre_filt: Apply a bandpass filter in frequency domain to the
             data before deconvolution. The list or tuple defines
             the four corner frequencies `(f1, f2, f3, f4)` of a cosine taper
@@ -2956,8 +2982,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             or None.
         :param inventory: Station metadata to use in search for adequate
             response. If inventory parameter is not supplied, the response
-            has to be attached to the trace with :meth:`Trace.attach_response`
-            beforehand.
+            has to be attached to the trace with
+            :meth:`obspy.core.trace.Trace.attach_response` beforehand.
 
         .. rubric:: Example
 

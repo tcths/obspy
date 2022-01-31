@@ -60,6 +60,14 @@ class FDSNInternalServerException(FDSNException):
     status_code = 500
 
 
+class FDSNNotImplementedException(FDSNException):
+    status_code = 501
+
+
+class FDSNBadGatewayException(FDSNException):
+    status_code = 502
+
+
 class FDSNServiceUnavailableException(FDSNException):
     status_code = 503
 
@@ -92,15 +100,19 @@ class FDSNNoServiceException(FDSNException):
 # https://www.fdsn.org/webservices/datacenters/
 # https://www.orfeus-eu.org/data/eida/nodes/
 URL_MAPPINGS = {
+    "AUSPASS": "http://auspass.edu.au",
     "BGR": "http://eida.bgr.de",
     "ETH": "http://eida.ethz.ch",
     "EMSC": "http://www.seismicportal.eu",
     "GEONET": "http://service.geonet.org.nz",
+    "GEOFON": "http://geofon.gfz-potsdam.de",
     "GFZ": "http://geofon.gfz-potsdam.de",
     "ICGC": "http://ws.icgc.cat",
+    "IESDMC": "http://batsws.earth.sinica.edu.tw",
     "INGV": "http://webservices.ingv.it",
     "IPGP": "http://ws.ipgp.fr",
     "IRIS": "http://service.iris.edu",
+    "IRISPH5": "http://service.iris.edu",
     "ISC": "http://isc-mirror.iris.washington.edu",
     "KNMI": "http://rdsa.knmi.nl",
     "KOERI": "http://eida.koeri.boun.edu.tr",
@@ -111,12 +123,18 @@ URL_MAPPINGS = {
     "ODC": "http://www.orfeus-eu.org",
     "ORFEUS": "http://www.orfeus-eu.org",
     "RESIF": "http://ws.resif.fr",
+    "RESIFPH5": "http://ph5ws.resif.fr",
     "RASPISHAKE": "https://fdsnws.raspberryshakedata.com",
     "SCEDC": "http://service.scedc.caltech.edu",
     "TEXNET": "http://rtserve.beg.utexas.edu",
     "UIB-NORSAR": "http://eida.geo.uib.no",
     "USGS": "http://earthquake.usgs.gov",
-    "USP": "http://sismo.iag.usp.br"}
+    "USP": "http://sismo.iag.usp.br",
+}
+URL_MAPPING_SUBPATHS = {
+    "IRISPH5": "/ph5ws",
+}
+URL_DEFAULT_SUBPATH = "/fdsnws"
 
 FDSNWS = ("dataselect", "event", "station")
 
@@ -152,8 +170,9 @@ DEFAULT_EVENT_PARAMETERS = [
 
 OPTIONAL_EVENT_PARAMETERS = [
     "latitude", "longitude", "minradius", "maxradius", "magnitudetype",
-    "includeallorigins", "includeallmagnitudes", "includearrivals", "eventid",
-    "limit", "offset", "catalog", "contributor", "updatedafter"]
+    "eventtype", "includeallorigins", "includeallmagnitudes",
+    "includearrivals", "eventid", "limit", "offset", "catalog", "contributor",
+    "updatedafter"]
 
 DEFAULT_PARAMETERS = {
     "dataselect": DEFAULT_DATASELECT_PARAMETERS,
@@ -221,6 +240,7 @@ DEFAULT_TYPES = {
     "includearrivals": bool,
     "matchtimeseries": bool,
     "eventid": str,
+    "eventtype": str,
     "limit": int,
     "offset": int,
     "orderby": str,
@@ -264,6 +284,7 @@ DEFAULT_VALUES = {
     "includearrivals": False,
     "matchtimeseries": False,
     "eventid": None,
+    "eventtype": None,
     "limit": None,
     "offset": 1,
     "orderby": "time",

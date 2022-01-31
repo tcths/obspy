@@ -11,7 +11,7 @@ sc3ml events read and write support.
     (https://www.gnu.org/copyleft/lesser.html)
 """
 import io
-import os
+from pathlib import Path
 import re
 
 from lxml import etree
@@ -31,10 +31,11 @@ def _read_sc3ml(filename, id_prefix='smi:org.gfz-potsdam.de/geofon/'):
     catalog is then generated using the QuakeML module.
 
     .. warning::
-    This function should NOT be called directly, it registers via the
-    the :meth:`~obspy.core.event.catalog.Catalog.write` method of an
-    ObsPy :class:`~obspy.core.event.catalog.Catalog` object, call this
-    instead.
+
+        This function should NOT be called directly, it registers via the
+        the :meth:`~obspy.core.event.catalog.Catalog.write` method of an
+        ObsPy :class:`~obspy.core.event.catalog.Catalog` object, call this
+        instead.
 
     :type filename: str
     :param filename: SC3ML file to be read.
@@ -72,9 +73,10 @@ def _read_sc3ml(filename, id_prefix='smi:org.gfz-potsdam.de/geofon/'):
                 version, ', '.join(SCHEMA_VERSION))
             raise ValueError(message)
 
-    xslt_filename = os.path.join(os.path.dirname(__file__), 'data',
-                                 'sc3ml_%s__quakeml_1.2.xsl' % version)
-    transform = etree.XSLT(etree.parse(xslt_filename))
+    xslt_filename = Path(__file__).parent / 'data'
+    xslt_filename = xslt_filename / ('sc3ml_%s__quakeml_1.2.xsl' % version)
+
+    transform = etree.XSLT(etree.parse(str(xslt_filename)))
     quakeml_doc = transform(sc3ml_doc,
                             ID_PREFIX=etree.XSLT.strparam(id_prefix))
 
@@ -96,7 +98,7 @@ def _write_sc3ml(catalog, filename, validate=False, verbose=False,
     :type catalog: :class:`~obspy.core.event.catalog.Catalog`
     :param catalog: The ObsPy Catalog object to write.
     :type filename: str or file
-    :param filename: Filename to write or open file-like object.
+    :param filename: Filename to write or open file-like object
     :type validate: bool
     :param validate: If True, the final SC3ML file will be validated against
         the SC3ML schema file. Raises an AssertionError if the validation
@@ -110,9 +112,9 @@ def _write_sc3ml(catalog, filename, validate=False, verbose=False,
     """
     nsmap_ = getattr(catalog, "nsmap", {})
     quakeml_doc = Pickler(nsmap=nsmap_).dumps(catalog)
-    xslt_filename = os.path.join(os.path.dirname(__file__), 'data',
-                                 'quakeml_1.2__sc3ml_0.10.xsl')
-    transform = etree.XSLT(etree.parse(xslt_filename))
+    xslt_filename = Path(__file__).parent / 'data'
+    xslt_filename = xslt_filename / 'quakeml_1.2__sc3ml_0.10.xsl'
+    transform = etree.XSLT(etree.parse(str(xslt_filename)))
     sc3ml_doc = transform(etree.parse(io.BytesIO(quakeml_doc)))
 
     # Remove events

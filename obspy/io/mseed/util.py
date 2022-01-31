@@ -5,6 +5,7 @@ MiniSEED specific utilities.
 import collections
 import ctypes as C  # NOQA
 import os
+from pathlib import Path
 import sys
 import warnings
 from datetime import datetime
@@ -923,7 +924,7 @@ def set_flags_in_fixed_headers(filename, flags):
     """
     Updates a given MiniSEED file with some fixed header flags.
 
-    :type filename: string
+    :type filename: str
     :param filename: Name of the MiniSEED file to be changed
     :type flags: dict
     :param flags: The flags to update in the MiniSEED file
@@ -1004,9 +1005,9 @@ def set_flags_in_fixed_headers(filename, flags):
     # import has to be here to break import loop
     from .core import _is_mseed
     # Basic check
-    if not os.path.isfile(filename) or not _is_mseed(filename):
+    if not Path(filename).is_file() or not _is_mseed(filename):
         raise IOError("File %s is not a valid MiniSEED file" % filename)
-    filesize = os.path.getsize(filename)
+    filesize = Path(filename).stat().st_size
 
     # Nested dictionaries to allow empty strings as wildcards
     class NestedDict(dict):
@@ -1477,10 +1478,12 @@ def _convert_flags_to_raw_byte(expected_flags, user_flags, recstart, recend):
     compared to the expected_signals, and its value is converted to bool.
     Missing values are considered false.
 
-    :type expected_flags: dict {int: str}
-    :param expected_flags: every possible flag in this field, with its offset
-    :type user_flags: dict {str: bool}
-    :param user_flags: user defined flags and its value
+    :type expected_flags: dict
+    :param expected_flags: every possible flag in this field, with its offset.
+        Structure: {int: str}.
+    :type user_flags: dict
+    :param user_flags: user defined flags and its value.
+        Structure: {str: bool}.
     :type recstart: UTCDateTime
     :param recstart: date of the first sample of the current record
     :type recstart: UTCDateTime

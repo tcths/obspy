@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module for handling ObsPy Stream objects.
+Module for handling ObsPy :class:`~obspy.core.stream.Stream` objects.
 
 :copyright:
     The ObsPy Development Team (devs@obspy.org)
@@ -12,10 +12,10 @@ import collections
 import copy
 import fnmatch
 import math
-import os
 import pickle
 import re
 import warnings
+from pathlib import Path
 from glob import glob, has_magic
 
 import numpy as np
@@ -41,7 +41,8 @@ def read(pathname_or_url=None, format=None, headonly=False, starttime=None,
          endtime=None, nearest_sample=True, dtype=None, apply_calib=False,
          check_compression=True, **kwargs):
     """
-    Read waveform files into an ObsPy Stream object.
+    Read waveform files into an ObsPy :class:`~obspy.core.stream.Stream`
+    object.
 
     The :func:`~obspy.core.stream.read` function opens either one or multiple
     waveform files given via file name or URL using the ``pathname_or_url``
@@ -212,7 +213,7 @@ def read(pathname_or_url=None, format=None, headonly=False, starttime=None,
             raise Exception("No file matching file pattern: %s" %
                             pathname_or_url)
         elif not has_magic(pathname_or_url) and \
-                not os.path.isfile(pathname_or_url):
+                not Path(pathname_or_url).is_file():
             raise IOError(2, "No such file or directory", pathname_or_url)
         # Only raise error if no start/end time has been set. This
         # will return an empty stream if the user chose a time window with
@@ -270,9 +271,9 @@ def _create_example_stream(headonly=False):
                'zeros': [0j, 0j]}}
 
     """
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = Path(__file__).parent / "data"
     if not headonly:
-        path = os.path.join(data_dir, "example.npz")
+        path = data_dir / "example.npz"
         data = np.load(path)
     st = Stream()
     for channel in ["EHZ", "EHN", "EHE"]:
@@ -291,14 +292,15 @@ def _create_example_stream(headonly=False):
         else:
             st.append(Trace(header=header))
     from obspy import read_inventory
-    inv = read_inventory(os.path.join(data_dir, "BW_RJOB.xml"))
+    inv = read_inventory(data_dir / "BW_RJOB.xml")
     st.attach_response(inv)
     return st
 
 
 class Stream(object):
     """
-    List like object of multiple ObsPy Trace objects.
+    List like object of multiple ObsPy :class:`~obspy.core.trace.Trace`
+    objects.
 
     :type traces: list of :class:`~obspy.core.trace.Trace`, optional
     :param traces: Initial list of ObsPy :class:`~obspy.core.trace.Trace`
@@ -544,7 +546,7 @@ class Stream(object):
         This function strictly compares the data and stats objects of each
         trace contained by the streams. If less strict behavior is desired,
         which may be the case for testing, consider using the
-        :func:`~obspy.core.util.testing.stream_almost_equal` function.
+        :func:`~obspy.core.util.testing.streams_almost_equal` function.
 
         :type other: :class:`~obspy.core.stream.Stream`
         :param other: Stream object for comparison.
@@ -659,7 +661,7 @@ class Stream(object):
         """
         Append a single Trace object to the current Stream object.
 
-        :param trace: :class:`~obspy.core.stream.Trace` object.
+        :param trace: :class:`~obspy.core.trace.Trace` object.
 
         .. rubric:: Example
 
@@ -917,8 +919,6 @@ class Stream(object):
         :param transparent: Make all backgrounds transparent (True/False). This
             will override the ``bgcolor`` and ``face_color`` arguments.
             Defaults to ``False``.
-        :param number_of_ticks: The number of ticks on the x-axis.
-            Defaults to ``4``.
         :param tick_format: The way the time axis is formatted.
             Defaults to ``'%H:%M:%S'`` or ``'%.2f'`` if ``type='relative'``.
         :param tick_rotation: Tick rotation in degrees.
@@ -1006,6 +1006,8 @@ class Stream(object):
             backslashes, or use r-prefixed strings, e.g.,
             ``r"$\\\\frac{m}{s}$"``.
             Defaults to ``None``, meaning no scale is drawn.
+        :param number_of_ticks: The number of ticks on the x-axis.
+            Defaults to ``4``.
         :param events: An optional list of events can be drawn on the plot if
             given.  They will be displayed as yellow stars with optional
             annotations.  They are given as a list of dictionaries. Each
@@ -1437,7 +1439,7 @@ class Stream(object):
                 raise NotImplementedError(msg)
         if format is None:
             # try to guess format from file extension
-            _, format = os.path.splitext(filename)
+            format = Path(filename).suffix
             format = format[1:]
         format = format.upper()
         try:
@@ -1857,8 +1859,29 @@ class Stream(object):
                 msg = "Selection criteria for channel and component are " + \
                       "mutually exclusive!"
                 raise ValueError(msg)
+
+        # For st.select(id=) without wildcards, use a quicker comparison mode:
+        quick_check = False
+        quick_check_possible = (id is not None
+                                and sampling_rate is None and npts is None
+                                and network is None and station is None
+                                and location is None and channel is None
+                                and component is None)
+        if quick_check_possible:
+            no_wildcards = not any(['?' in id or '*' in id or '[' in id])
+            if no_wildcards:
+                quick_check = True
+                [net, sta, loc, chan] = id.upper().split('.')
+
         traces = []
         for trace in traces_after_inventory_filter:
+            if quick_check:
+                if (trace.stats.network.upper() == net
+                        and trace.stats.station.upper() == sta
+                        and trace.stats.location.upper() == loc
+                        and trace.stats.channel.upper() == chan):
+                    traces.append(trace)
+                continue
             # skip trace if any given criterion is not matched
             if id and not fnmatch.fnmatch(trace.id.upper(), id.upper()):
                 continue
@@ -2275,7 +2298,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         :type sampling_rate: float
         :param sampling_rate: The sampling rate of the resampled signal.
-        :type window: array_like, callable, str, float, or tuple, optional
+        :type window: :class:`numpy.ndarray`, callable, str, float, or tuple,
+            optional
         :param window: Specifies the window applied to the signal in the
             Fourier domain. Defaults ``'hanning'`` window. See
             :func:`scipy.signal.resample` for details.
@@ -3205,10 +3229,10 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         :type npts_tol: int
         :param npts_tol: Tolerate traces with different number of points
             with a difference up to this value. Surplus samples are discarded.
-        :type time_tol: float (seconds)
-        :param time_tol: Tolerate difference in startime when setting the
-            new starttime of the stack. If starttimes differs more than this
-            value it will be set to timestamp 0.
+        :type time_tol: float
+        :param time_tol: Tolerate difference, in seconds, in startime when
+            setting the new starttime of the stack. If starttimes differs more
+            than this value it will be set to timestamp 0.
 
         >>> from obspy import read
         >>> st = read()
@@ -3262,7 +3286,7 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         Helper method to create a dummy Stream object (with data always equal
         to one) from a string representation of the Stream, mostly for
         debugging purposes.
-
+        >>> import os
         >>> s = ['', '', '3 Trace(s) in Stream:',
         ...      'IU.GRFO..HH2 | 2016-01-07T00:00:00.008300Z - '
         ...      '2016-01-07T00:00:30.098300Z | 10.0 Hz, 301 samples',
@@ -3547,7 +3571,12 @@ def _is_pickle(filename):  # @UnusedVariable
     if isinstance(filename, str):
         try:
             with open(filename, 'rb') as fp:
-                st = pickle.load(fp)
+                if b"obspy.core.stream" in fp.read(100):
+                    fp.seek(0)
+                    st = pickle.load(fp)
+                    return True
+                else:
+                    return False
         except Exception:
             return False
     else:
